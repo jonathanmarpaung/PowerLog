@@ -5,6 +5,7 @@ import "fmt"
 // --------------------= GLOBAL =--------------------
 
 const MaxLogs int = 999
+const MaxMenuList int = 20
 
 // --------------------= UTILITY =--------------------
 
@@ -76,6 +77,42 @@ func FloatToStr(value float64) string {
 	return result
 }
 
+// --------------------= Menu =--------------------
+
+type MenuList struct {
+	id    string
+	label string
+}
+
+type Menu struct {
+	list [MaxMenuList]MenuList
+	n    int
+}
+
+func NewMenuList(id string, label string) MenuList {
+	var list MenuList
+
+	list.id = id
+	list.label = label
+
+	return list
+}
+
+func PrintMenu(menu Menu) {
+	var index int
+	var currentList MenuList
+
+	for index = 1; index <= menu.n; index++ {
+		currentList = menu.list[index-1]
+		fmt.Printf("%d. %s\n", index, currentList.label)
+	}
+}
+
+func AddMenuList(menu *Menu, list MenuList) {
+	menu.list[menu.n] = list
+	menu.n = menu.n + 1
+}
+
 // --------------------= DURATION =--------------------
 
 type Duration struct {
@@ -145,6 +182,16 @@ func AddLog(logs *Logs, deviceName string, deviceLocation string, power Power, d
 	logs.n = logs.n + 1
 }
 
+func DeleteLog(logs *Logs, index int) {
+	var k int
+
+	for k = index; k < logs.n-1; k++ {
+		logs.list[k] = logs.list[k+1]
+	}
+
+	logs.n = logs.n - 1
+}
+
 // --------------------= TABLE =--------------------
 
 func PrintTableHead() {
@@ -188,9 +235,10 @@ func PrintLogTable(logs Logs) {
 func main() {
 	var logs Logs
 
-	AddLog(&logs, "Laptop", "Kamar_Tidur", 123.23, NewDuration(1, 20, 10))
+	AddLog(&logs, "Laptop", "Kamar_Tidur", 123.23, NewDuration(1, 20, 30))
 	AddLog(&logs, "Kipas_Angin", "Ruang_Tamu", 45.50, NewDuration(4, 0, 0))
 	AddLog(&logs, "Televisi", "Ruang_Keluarga", 110.00, NewDuration(2, 30, 0))
+	AddLog(&logs, "Pemanas_Air", "Kamar_Mandi", 550.00, NewDuration(10, 20, 30))
 
 	PrintLogTable(logs)
 }

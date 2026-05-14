@@ -5,7 +5,6 @@ import "fmt"
 // --------------------= GLOBAL =--------------------
 
 const MaxData int = 999
-const MaxMenuItem int = 20
 
 // --------------------= UTILITY =--------------------
 
@@ -131,6 +130,7 @@ func StrToInt(str string) int {
 }
 
 // --------------------= Box =--------------------
+
 func PrintBoxMessage(message string) {
 	var index int
 
@@ -153,12 +153,14 @@ func PrintBoxMessage(message string) {
 }
 
 // --------------------= Terminal =--------------------
+
 func ClearTerminal() {
 	// TODO: Clear terminal with library os
 	fmt.Print("\033[H\033[2J")
 }
 
 // --------------------= Error Handler =--------------------
+
 type ErrorHandler struct {
 	isError bool
 	message string
@@ -179,6 +181,8 @@ func ShowError(errorHandler ErrorHandler) {
 }
 
 // --------------------= Menu =--------------------
+
+const MaxMenuItem int = 20
 
 type MenuItem struct {
 	id    string
@@ -263,6 +267,7 @@ func MenuWithIndex(menu Menu, errorHandler *ErrorHandler) string {
 }
 
 // --------------------= TABLE =--------------------
+
 const MaxColumns int = 20
 const DEPENDS_ON_LABEL int = -1
 const MaxWrapLines int = 20

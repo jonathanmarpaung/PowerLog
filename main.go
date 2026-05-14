@@ -86,6 +86,10 @@ func IsNumber(str string) bool {
 
 	if len(str) == 0 {
 		isNumber = false
+	} else {
+		if len(str) == 1 && str[0] == '-' {
+			isNumber = false
+		}
 	}
 
 	for index < len(str) && isNumber {
@@ -187,12 +191,12 @@ type Menu struct {
 }
 
 func NewMenuItem(id string, label string) MenuItem {
-	var list MenuItem
+	var item MenuItem
 
-	list.id = id
-	list.label = label
+	item.id = id
+	item.label = label
 
-	return list
+	return item
 }
 
 func AddMenuItem(menu *Menu, list MenuItem) {
@@ -293,14 +297,15 @@ type Logs struct {
 func AddLog(logs *Logs, deviceName string, deviceLocation string, power Power, duration Duration) {
 	var log Log
 
-	log.deviceName = deviceName
-	log.deviceLocation = deviceLocation
-	log.power = power
-	log.duration = duration
+	if logs.n < MaxLogs {
+		log.deviceName = deviceName
+		log.deviceLocation = deviceLocation
+		log.power = power
+		log.duration = duration
 
-	logs.list[logs.n] = log
-
-	logs.n = logs.n + 1
+		logs.list[logs.n] = log
+		logs.n = logs.n + 1
+	}
 }
 
 func DeleteLog(logs *Logs, index int) {
@@ -366,23 +371,20 @@ func main() {
 	var menu Menu
 	var errorHandler ErrorHandler
 	var running bool
+	var selectedMenu string
 
-	// menu
+	// Menu
 	AddMenuItem(&menu, NewMenuItem("Insert", "Insert Data"))
 	AddMenuItem(&menu, NewMenuItem("Exit", "Exit"))
 
-	// dummy data
-	AddLog(&logs, "Laptop", "Kamar_Tidur", 123.23, NewDuration(1, 20, 30))
-	AddLog(&logs, "Kipas_Angin", "Ruang_Tamu", 45.50, NewDuration(4, 0, 0))
-	AddLog(&logs, "Televisi", "Ruang_Keluarga", 110.00, NewDuration(2, 30, 0))
-	AddLog(&logs, "Pemanas_Air", "Kamar_Mandi", 550.00, NewDuration(10, 20, 30))
+	// Dummy data
+	AddLog(&logs, "Laptop", "Kamar Tidur", 123.23, NewDuration(1, 20, 30))
+	AddLog(&logs, "Kipas Angin", "Ruang Tamu", 45.50, NewDuration(4, 0, 0))
 
-	// running the program
 	running = true
 
 	for running {
 		ClearTerminal()
-
 		PrintLogTable(logs)
 
 		if errorHandler.isError {
@@ -390,7 +392,11 @@ func main() {
 			ResetError(&errorHandler)
 		}
 
-		switch MenuWithIndex(menu, &errorHandler) {
+		selectedMenu = MenuWithIndex(menu, &errorHandler)
+
+		switch selectedMenu {
+		case "Insert":
+			// TODO: create function to handle insert data, example: InsertLogFeature(&logs, &errorHandler)
 		case "Exit":
 			running = false
 		}

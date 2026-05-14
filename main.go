@@ -375,6 +375,8 @@ func main() {
 
 	// Menu
 	AddMenuItem(&menu, NewMenuItem("Insert", "Insert Data"))
+	AddMenuItem(&menu, NewMenuItem("Update", "Update Data"))
+	AddMenuItem(&menu, NewMenuItem("Delete", "Delete Data"))
 	AddMenuItem(&menu, NewMenuItem("Exit", "Exit"))
 
 	// Dummy data
@@ -397,6 +399,10 @@ func main() {
 		switch selectedMenu {
 		case "Insert":
 			// TODO: create function to handle insert data, example: InsertLogFeature(&logs, &errorHandler)
+		case "Update":
+			// TODO: create function to handle update data, example: UpdateLogFeature(&logs, &errorHandler)
+		case "Delete":
+			// TODO: create function to handle delete data, example: DeleteLogFeature(&logs, &errorHandler)
 		case "Exit":
 			running = false
 		}

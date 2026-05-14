@@ -5,7 +5,7 @@ import "fmt"
 // --------------------= GLOBAL =--------------------
 
 const MaxLogs int = 999
-const MaxMenuList int = 20
+const MaxMenuItem int = 20
 
 // --------------------= UTILITY =--------------------
 
@@ -77,20 +77,117 @@ func FloatToStr(value float64) string {
 	return result
 }
 
+func IsNumber(str string) bool {
+	var isNumber bool
+	var index int
+
+	isNumber = true
+	index = 0
+
+	if len(str) == 0 {
+		isNumber = false
+	}
+
+	for index < len(str) && isNumber {
+		if str[index] == '-' {
+			if index != 0 {
+				isNumber = false
+			}
+		} else if str[index] < '0' || str[index] > '9' {
+			isNumber = false
+		}
+		index = index + 1
+	}
+
+	return isNumber
+}
+
+func StrToInt(str string) int {
+	var index, result int
+	var isNegative bool
+
+	result = 0
+	isNegative = false
+
+	for index = 0; index < len(str); index++ {
+		if str[index] == '-' {
+			if index == 0 {
+				isNegative = true
+			}
+		} else {
+			result = (result * 10) + int(str[index]-'0')
+		}
+	}
+
+	if isNegative {
+		result = -result
+	}
+
+	return result
+}
+
+// --------------------= Box =--------------------
+func PrintBoxMessage(message string) {
+	var index int
+
+	// head
+	fmt.Printf("╭")
+	for index = 0; index < len(message)+2; index++ {
+		fmt.Printf("─")
+	}
+	fmt.Printf("╮\n")
+
+	// body
+	fmt.Printf("│ %s │\n", message)
+
+	// foot
+	fmt.Printf("╰")
+	for index = 0; index < len(message)+2; index++ {
+		fmt.Printf("─")
+	}
+	fmt.Printf("╯\n")
+}
+
+// --------------------= Terminal =--------------------
+func ClearTerminal() {
+	// TODO: Clear terminal with library os
+	fmt.Print("\033[H\033[2J")
+}
+
+// --------------------= Error Handler =--------------------
+type ErrorHandler struct {
+	isError bool
+	message string
+}
+
+func ResetError(errorHandler *ErrorHandler) {
+	errorHandler.isError = false
+	errorHandler.message = ""
+}
+
+func SetError(errorHandler *ErrorHandler, message string) {
+	errorHandler.isError = true
+	errorHandler.message = message
+}
+
+func ShowError(errorHandler ErrorHandler) {
+	PrintBoxMessage("Error: " + errorHandler.message)
+}
+
 // --------------------= Menu =--------------------
 
-type MenuList struct {
+type MenuItem struct {
 	id    string
 	label string
 }
 
 type Menu struct {
-	list [MaxMenuList]MenuList
+	list [MaxMenuItem]MenuItem
 	n    int
 }
 
-func NewMenuList(id string, label string) MenuList {
-	var list MenuList
+func NewMenuItem(id string, label string) MenuItem {
+	var list MenuItem
 
 	list.id = id
 	list.label = label
@@ -98,19 +195,43 @@ func NewMenuList(id string, label string) MenuList {
 	return list
 }
 
-func PrintMenu(menu Menu) {
-	var index int
-	var currentList MenuList
-
-	for index = 1; index <= menu.n; index++ {
-		currentList = menu.list[index-1]
-		fmt.Printf("%d. %s\n", index, currentList.label)
-	}
-}
-
-func AddMenuList(menu *Menu, list MenuList) {
+func AddMenuItem(menu *Menu, list MenuItem) {
 	menu.list[menu.n] = list
 	menu.n = menu.n + 1
+}
+
+func MenuWithIndex(menu Menu, errorHandler *ErrorHandler) string {
+	var inputStr, selection string
+	var index, choiceInt int
+	var currentItem MenuItem
+	var isNumber bool
+
+	// Show menu items
+	for index = 1; index <= menu.n; index++ {
+		currentItem = menu.list[index-1]
+		fmt.Printf("%d. %s\n", index, currentItem.label)
+	}
+
+	// input from user
+	fmt.Printf("Selection: ")
+	fmt.Scan(&inputStr)
+
+	// 3. validate and process number
+	isNumber = IsNumber(inputStr)
+
+	if isNumber {
+		choiceInt = StrToInt(inputStr)
+
+		if choiceInt >= 1 && choiceInt <= menu.n {
+			selection = menu.list[choiceInt-1].id
+		} else {
+			SetError(errorHandler, "There is no option "+IntToStr(choiceInt)+" in the menu!")
+		}
+	} else {
+		SetError(errorHandler, "Input must be a number!")
+	}
+
+	return selection
 }
 
 // --------------------= DURATION =--------------------
@@ -185,11 +306,19 @@ func AddLog(logs *Logs, deviceName string, deviceLocation string, power Power, d
 func DeleteLog(logs *Logs, index int) {
 	var k int
 
-	for k = index; k < logs.n-1; k++ {
-		logs.list[k] = logs.list[k+1]
-	}
+	if index >= 0 && index < logs.n {
+		for k = index; k < logs.n-1; k++ {
+			logs.list[k] = logs.list[k+1]
+		}
 
-	logs.n = logs.n - 1
+		// empty the data
+		logs.list[logs.n-1].deviceName = ""
+		logs.list[logs.n-1].deviceLocation = ""
+		logs.list[logs.n-1].power = 0
+		logs.list[logs.n-1].duration = NewDuration(0, 0, 0)
+
+		logs.n = logs.n - 1
+	}
 }
 
 // --------------------= TABLE =--------------------
@@ -234,11 +363,36 @@ func PrintLogTable(logs Logs) {
 
 func main() {
 	var logs Logs
+	var menu Menu
+	var errorHandler ErrorHandler
+	var running bool
 
+	// menu
+	AddMenuItem(&menu, NewMenuItem("Insert", "Insert Data"))
+	AddMenuItem(&menu, NewMenuItem("Exit", "Exit"))
+
+	// dummy data
 	AddLog(&logs, "Laptop", "Kamar_Tidur", 123.23, NewDuration(1, 20, 30))
 	AddLog(&logs, "Kipas_Angin", "Ruang_Tamu", 45.50, NewDuration(4, 0, 0))
 	AddLog(&logs, "Televisi", "Ruang_Keluarga", 110.00, NewDuration(2, 30, 0))
 	AddLog(&logs, "Pemanas_Air", "Kamar_Mandi", 550.00, NewDuration(10, 20, 30))
 
-	PrintLogTable(logs)
+	// running the program
+	running = true
+
+	for running {
+		ClearTerminal()
+
+		PrintLogTable(logs)
+
+		if errorHandler.isError {
+			ShowError(errorHandler)
+			ResetError(&errorHandler)
+		}
+
+		switch MenuWithIndex(menu, &errorHandler) {
+		case "Exit":
+			running = false
+		}
+	}
 }

@@ -200,8 +200,32 @@ func NewMenuItem(id string, label string) MenuItem {
 }
 
 func AddMenuItem(menu *Menu, list MenuItem) {
-	menu.list[menu.n] = list
-	menu.n = menu.n + 1
+	if menu.n < MaxMenuItem {
+		menu.list[menu.n] = list
+		menu.n = menu.n + 1
+	}
+}
+
+func UpdateMenuItem(menu *Menu, index int, list MenuItem) {
+	if index >= 0 && index < menu.n {
+		menu.list[index] = list
+	}
+}
+
+func RemoveMenuItem(menu *Menu, index int) {
+	var k int
+
+	if index >= 0 && index < menu.n {
+		for k = index; k < menu.n-1; k++ {
+			menu.list[k] = menu.list[k+1]
+		}
+
+		// empty the data
+		menu.list[menu.n-1].id = ""
+		menu.list[menu.n-1].label = ""
+
+		menu.n = menu.n - 1
+	}
 }
 
 func MenuWithIndex(menu Menu, errorHandler *ErrorHandler) string {
@@ -289,6 +313,16 @@ func AddCell(row *TableRow, data string) {
 		row.cells[row.n] = data
 		row.n = row.n + 1
 	}
+}
+
+func ResetRows(row *TableRow) {
+	var index int
+
+	for index = 0; index < row.n; index++ {
+		row.cells[index] = ""
+	}
+
+	row.n = 0
 }
 
 func AddRow(rows *TableRows, row TableRow) {
@@ -520,14 +554,14 @@ func PrintLog(logs Logs) {
 	var rows TableRows
 	var currentRow TableRow
 
-	AddColumn(&rowTable, NewColumn("No", DEPENDS_ON_LABEL))
+	AddColumn(&rowTable, NewColumn("No.", DEPENDS_ON_LABEL))
 	AddColumn(&rowTable, NewColumn("Nama Perangkat", DEPENDS_ON_LABEL))
 	AddColumn(&rowTable, NewColumn("Lokasi Perangkat", DEPENDS_ON_LABEL))
 	AddColumn(&rowTable, NewColumn("Durasi Penggunaan", DEPENDS_ON_LABEL))
 	AddColumn(&rowTable, NewColumn("Daya Tergunakan", DEPENDS_ON_LABEL))
 
 	for index = 0; index < logs.n; index++ {
-		currentRow.n = 0
+		ResetRows(&currentRow)
 
 		AddCell(&currentRow, IntToStr(index+1))
 		AddCell(&currentRow, logs.list[index].deviceName)
@@ -560,6 +594,7 @@ func main() {
 	AddLog(&logs, "Laptop", "Kamar Tidur", 123.23, NewDuration(1, 20, 30))
 	AddLog(&logs, "Kipas Angin", "Ruang Tamu", 45.50, NewDuration(4, 0, 0))
 
+	// running
 	running = true
 
 	for running {

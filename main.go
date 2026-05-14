@@ -4,7 +4,7 @@ import "fmt"
 
 // --------------------= GLOBAL =--------------------
 
-const MaxLogs int = 999
+const MaxData int = 999
 const MaxMenuItem int = 20
 
 // --------------------= UTILITY =--------------------
@@ -238,6 +238,194 @@ func MenuWithIndex(menu Menu, errorHandler *ErrorHandler) string {
 	return selection
 }
 
+// --------------------= TABLE =--------------------
+const MaxColumns int = 20
+const DEPENDS_ON_LABEL int = -1
+const MaxWrapLines int = 20
+
+type TableColumn struct {
+	label string
+	width int
+}
+
+type Table struct {
+	columns [MaxColumns]TableColumn
+	n       int
+}
+
+type TableRow struct {
+	cells [MaxColumns]string
+	n     int
+}
+
+type TableRows struct {
+	list [MaxData]TableRow
+	n    int
+}
+
+type WrappedText struct {
+	lines [MaxWrapLines]string
+	n     int
+}
+
+func NewColumn(label string, width int) TableColumn {
+	var column TableColumn
+
+	column.label = label
+	column.width = width
+
+	return column
+}
+
+func AddColumn(table *Table, column TableColumn) {
+	if table.n < MaxColumns {
+		table.columns[table.n] = column
+		table.n = table.n + 1
+	}
+}
+
+func AddCell(row *TableRow, data string) {
+	if row.n < MaxColumns {
+		row.cells[row.n] = data
+		row.n = row.n + 1
+	}
+}
+
+func AddRow(rows *TableRows, row TableRow) {
+	if rows.n < MaxData {
+		rows.list[rows.n] = row
+		rows.n = rows.n + 1
+	}
+}
+
+func GetColumnWidth(column TableColumn) int {
+	var width int
+
+	if column.width == DEPENDS_ON_LABEL {
+		width = len(column.label)
+	} else {
+		width = column.width
+	}
+
+	return width
+}
+
+func WrapText(text string, width int) WrappedText {
+	var result WrappedText
+	var currentLine string
+	var index, textLen int
+
+	textLen = len(text)
+
+	if width <= 0 || textLen == 0 {
+		result.lines[0] = text
+		result.n = 1
+	} else {
+		for index = 0; index < textLen; index++ {
+			currentLine = currentLine + string(text[index])
+
+			if len(currentLine) == width {
+				result.lines[result.n] = currentLine
+				result.n = result.n + 1
+				currentLine = ""
+			}
+		}
+
+		if len(currentLine) > 0 {
+			result.lines[result.n] = currentLine
+			result.n = result.n + 1
+		}
+	}
+
+	return result
+}
+
+func PrintTableLine(table Table, leftChar string, midChar string, rightChar string) {
+	var k, index, length int
+	var currentColumn TableColumn
+
+	fmt.Printf("%s", leftChar)
+
+	for index = 0; index < table.n; index++ {
+		currentColumn = table.columns[index]
+		length = GetColumnWidth(currentColumn)
+
+		for k = 0; k < length+2; k++ {
+			fmt.Printf("─")
+		}
+
+		if index == table.n-1 {
+			fmt.Printf("%s\n", rightChar)
+		} else {
+			fmt.Printf("%s", midChar)
+		}
+	}
+}
+
+func PrintSingleRowWrapped(table Table, row TableRow) {
+	var colIndex, lineIndex, maxLines, width int
+	var wrappedCells [MaxColumns]WrappedText
+	var currentColumn TableColumn
+	var currentCell string
+	var currentWrapped WrappedText
+
+	maxLines = 1
+
+	for colIndex = 0; colIndex < table.n; colIndex++ {
+		currentColumn = table.columns[colIndex]
+		width = GetColumnWidth(currentColumn)
+
+		if colIndex < row.n {
+			currentCell = row.cells[colIndex]
+		} else {
+			currentCell = ""
+		}
+
+		currentWrapped = WrapText(currentCell, width)
+		wrappedCells[colIndex] = currentWrapped
+
+		if currentWrapped.n > maxLines {
+			maxLines = currentWrapped.n
+		}
+	}
+
+	for lineIndex = 0; lineIndex < maxLines; lineIndex++ {
+		fmt.Printf("│")
+
+		for colIndex = 0; colIndex < table.n; colIndex++ {
+			width = GetColumnWidth(table.columns[colIndex])
+			currentWrapped = wrappedCells[colIndex]
+
+			if lineIndex < currentWrapped.n {
+				fmt.Printf(" %-*s │", width, currentWrapped.lines[lineIndex])
+			} else {
+				fmt.Printf(" %-*s │", width, "")
+			}
+		}
+		fmt.Printf("\n")
+	}
+}
+
+func PrintTable(table Table, rows TableRows) {
+	var headerRow TableRow
+	var index int
+
+	for index = 0; index < table.n; index++ {
+		AddCell(&headerRow, table.columns[index].label)
+	}
+
+	PrintTableLine(table, "╭", "┬", "╮")
+
+	PrintSingleRowWrapped(table, headerRow)
+
+	for index = 0; index < rows.n; index++ {
+		PrintTableLine(table, "├", "┼", "┤")
+		PrintSingleRowWrapped(table, rows.list[index])
+	}
+
+	PrintTableLine(table, "╰", "┴", "╯")
+}
+
 // --------------------= DURATION =--------------------
 
 type Duration struct {
@@ -290,14 +478,14 @@ type Log struct {
 }
 
 type Logs struct {
-	list [MaxLogs]Log
+	list [MaxData]Log
 	n    int
 }
 
 func AddLog(logs *Logs, deviceName string, deviceLocation string, power Power, duration Duration) {
 	var log Log
 
-	if logs.n < MaxLogs {
+	if logs.n < MaxData {
 		log.deviceName = deviceName
 		log.deviceLocation = deviceLocation
 		log.power = power
@@ -326,42 +514,31 @@ func DeleteLog(logs *Logs, index int) {
 	}
 }
 
-// --------------------= TABLE =--------------------
-
-func PrintTableHead() {
-	fmt.Println("╭─────┬──────────────────────────┬─────────────────────────┬───────────────────────────────────────────────────┬─────────────────╮")
-	fmt.Println("│ No. │      Nama Perangkat      │     Lokasi Perangkat    │                  Durasi Pemakaian                 │ Komsumsi Energi │")
-}
-
-func PrintTableSeparator() {
-	fmt.Println("├─────┼──────────────────────────┼─────────────────────────┼───────────────────────────────────────────────────┼─────────────────┤")
-}
-
-func PrintTableFoot() {
-	fmt.Println("╰─────┴──────────────────────────┴─────────────────────────┴───────────────────────────────────────────────────┴─────────────────╯")
-}
-
-func PrintLogTable(logs Logs) {
+func PrintLog(logs Logs) {
 	var index int
-	var currentLog Log
+	var rowTable Table
+	var rows TableRows
+	var currentRow TableRow
 
-	PrintTableHead()
+	AddColumn(&rowTable, NewColumn("No", DEPENDS_ON_LABEL))
+	AddColumn(&rowTable, NewColumn("Nama Perangkat", DEPENDS_ON_LABEL))
+	AddColumn(&rowTable, NewColumn("Lokasi Perangkat", DEPENDS_ON_LABEL))
+	AddColumn(&rowTable, NewColumn("Durasi Penggunaan", DEPENDS_ON_LABEL))
+	AddColumn(&rowTable, NewColumn("Daya Tergunakan", DEPENDS_ON_LABEL))
 
-	for index = 1; index <= logs.n; index++ {
-		PrintTableSeparator()
+	for index = 0; index < logs.n; index++ {
+		currentRow.n = 0
 
-		currentLog = logs.list[index-1]
+		AddCell(&currentRow, IntToStr(index+1))
+		AddCell(&currentRow, logs.list[index].deviceName)
+		AddCell(&currentRow, logs.list[index].deviceLocation)
+		AddCell(&currentRow, DurationToStr(logs.list[index].duration))
+		AddCell(&currentRow, PowerToStr(logs.list[index].power))
 
-		fmt.Printf("│ %-3d │ %-24s │ %-23s │ %-49s │ %-15s │\n",
-			index,
-			currentLog.deviceName,
-			currentLog.deviceLocation,
-			DurationToStr(currentLog.duration),
-			PowerToStr(currentLog.power),
-		)
+		AddRow(&rows, currentRow)
 	}
 
-	PrintTableFoot()
+	PrintTable(rowTable, rows)
 }
 
 // --------------------= MAIN =--------------------
@@ -369,9 +546,9 @@ func PrintLogTable(logs Logs) {
 func main() {
 	var logs Logs
 	var menu Menu
-	var errorHandler ErrorHandler
 	var running bool
 	var selectedMenu string
+	var errorHandler ErrorHandler
 
 	// Menu
 	AddMenuItem(&menu, NewMenuItem("Insert", "Insert Data"))
@@ -387,7 +564,8 @@ func main() {
 
 	for running {
 		ClearTerminal()
-		PrintLogTable(logs)
+
+		PrintLog(logs)
 
 		if errorHandler.isError {
 			ShowError(errorHandler)

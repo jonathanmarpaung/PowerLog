@@ -6,6 +6,7 @@ import "fmt"
 
 const MaxData int = 999
 
+// --------------------= FRAMEWORK =--------------------
 // --------------------= UTILITY =--------------------
 
 func digitsToString(number int) string {
@@ -865,6 +866,7 @@ func PrintTable(context *Context, table *Table, rows *TableRows) {
 	PrintTableLine(context, table, "╰", "┴", "╯", margin.left)
 }
 
+// --------------------= MAIN CODE =--------------------
 // --------------------= DURATION =--------------------
 
 type Duration struct {
@@ -993,7 +995,7 @@ func LogPage(context *Context, logs *Logs) {
 	AddMenuItem(&menu, NewMenuItem("Delete", "Delete Data"))
 	AddGlobalMenu(&menu)
 
-	selectedMenu = MenuWithIndex(context, &menu, PosCenter+AlignLeft+SizeFit)
+	selectedMenu = MenuWithIndex(context, &menu, 0)
 
 	if !ExecuteGlobalMenu(context, selectedMenu) {
 		switch selectedMenu {

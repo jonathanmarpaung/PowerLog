@@ -129,6 +129,31 @@ func StrToInt(str string) int {
 	return result
 }
 
+func InputString() string {
+	var result string
+	var char rune
+	var isReading bool
+
+	isReading = true
+	result = ""
+
+	fmt.Scanf("%c", &char)
+	if char != '\n' {
+		result = result + string(char)
+	}
+
+	for isReading {
+		fmt.Scanf("%c", &char)
+		if char == '\n' {
+			isReading = false
+		} else if char != '\r' {
+			result = result + string(char)
+		}
+	}
+
+	return result
+}
+
 //--------------------= STYLING & CANVAS ENGINE =--------------------
 
 // Category 1: Position Element In Canvas
@@ -218,31 +243,6 @@ func PrintSpace(count int) {
 
 // --------------------= Box =--------------------
 
-func SplitByNewLine(text string) WrappedText {
-	var result WrappedText
-	var currentLine string
-	var index int
-
-	for index = 0; index < len(text); index++ {
-		if text[index] == '\n' {
-			if result.n < MaxWrapLines {
-				result.lines[result.n] = currentLine
-				result.n = result.n + 1
-				currentLine = ""
-			}
-		} else {
-			currentLine = currentLine + string(text[index])
-		}
-	}
-
-	if result.n < MaxWrapLines {
-		result.lines[result.n] = currentLine
-		result.n = result.n + 1
-	}
-
-	return result
-}
-
 func PrintBoxMessage(context *Context, message string, styleCode int) {
 	var styleConfig StyleConfig
 	var margin, textPad Padding
@@ -251,7 +251,7 @@ func PrintBoxMessage(context *Context, message string, styleCode int) {
 	var currentLine string
 
 	styleConfig = DecodeStyle(styleCode)
-	splitLines = SplitByNewLine(message)
+	splitLines = WrapText(message, context.canvas.width-4)
 
 	maxLineWidth = 0
 	for index = 0; index < splitLines.n; index++ {
@@ -306,7 +306,7 @@ func PrintMessage(context *Context, message string, styleCode int) {
 	var currentLine string
 
 	styleConfig = DecodeStyle(styleCode)
-	splitLines = SplitByNewLine(message)
+	splitLines = WrapText(message, context.canvas.width)
 
 	maxLineWidth = 0
 	for index = 0; index < splitLines.n; index++ {
@@ -686,7 +686,7 @@ func AddRow(rows *TableRows, row TableRow) {
 	}
 }
 
-func GetColumnWidth(context Context, table Table, column TableColumn) int {
+func GetColumnWidth(context *Context, table *Table, column TableColumn) int {
 	var width, effectiveCanvas, bordersAndSpaces int
 	var styleConfig StyleConfig
 
@@ -709,7 +709,7 @@ func GetColumnWidth(context Context, table Table, column TableColumn) int {
 	return width
 }
 
-func GetTableTotalWidth(context Context, table Table) int {
+func GetTableTotalWidth(context *Context, table *Table) int {
 	var total, index int
 
 	total = (table.n * 3) + 1
@@ -760,7 +760,7 @@ func WrapText(text string, width int) WrappedText {
 	return result
 }
 
-func PrintTableLine(context Context, table *Table, leftChar string, midChar string, rightChar string, marginLeft int) {
+func PrintTableLine(context *Context, table *Table, leftChar string, midChar string, rightChar string, marginLeft int) {
 	var k, index, length int
 	var currentColumn TableColumn
 
@@ -769,7 +769,7 @@ func PrintTableLine(context Context, table *Table, leftChar string, midChar stri
 
 	for index = 0; index < table.n; index++ {
 		currentColumn = table.columns[index]
-		length = GetColumnWidth(context, *table, currentColumn)
+		length = GetColumnWidth(context, table, currentColumn)
 
 		for k = 0; k < length+2; k++ {
 			fmt.Printf("─")
@@ -783,7 +783,7 @@ func PrintTableLine(context Context, table *Table, leftChar string, midChar stri
 	}
 }
 
-func PrintSingleRowWrapped(context Context, table *Table, row *TableRow, marginLeft int) {
+func PrintSingleRowWrapped(context *Context, table *Table, row *TableRow, marginLeft int) {
 	var colIndex, lineIndex, maxLines, width int
 	var wrappedCells [MaxColumns]WrappedText
 	var currentColumn TableColumn
@@ -795,7 +795,7 @@ func PrintSingleRowWrapped(context Context, table *Table, row *TableRow, marginL
 
 	for colIndex = 0; colIndex < table.n; colIndex++ {
 		currentColumn = table.columns[colIndex]
-		width = GetColumnWidth(context, *table, currentColumn)
+		width = GetColumnWidth(context, table, currentColumn)
 
 		if colIndex < row.n {
 			currentCell = row.cells[colIndex]
@@ -817,7 +817,7 @@ func PrintSingleRowWrapped(context Context, table *Table, row *TableRow, marginL
 
 		for colIndex = 0; colIndex < table.n; colIndex++ {
 			currentColumn = table.columns[colIndex]
-			width = GetColumnWidth(context, *table, currentColumn)
+			width = GetColumnWidth(context, table, currentColumn)
 			currentWrapped = wrappedCells[colIndex]
 
 			if lineIndex < currentWrapped.n {
@@ -845,7 +845,7 @@ func PrintTable(context *Context, table *Table, rows *TableRows) {
 	var margin Padding
 
 	styleConfig = DecodeStyle(table.style)
-	tableTotalWidth = GetTableTotalWidth(*context, *table)
+	tableTotalWidth = GetTableTotalWidth(context, table)
 	margin = CalculatePadding(context.canvas.width, tableTotalWidth, styleConfig.position)
 
 	for index = 0; index < table.n; index++ {
@@ -853,16 +853,16 @@ func PrintTable(context *Context, table *Table, rows *TableRows) {
 	}
 
 	// 3. Cetak Keseluruhan dengan menyuntikkan margin.left
-	PrintTableLine(*context, table, "╭", "┬", "╮", margin.left)
+	PrintTableLine(context, table, "╭", "┬", "╮", margin.left)
 
-	PrintSingleRowWrapped(*context, table, &headerRow, margin.left)
+	PrintSingleRowWrapped(context, table, &headerRow, margin.left)
 
 	for index = 0; index < rows.n; index++ {
-		PrintTableLine(*context, table, "├", "┼", "┤", margin.left)
-		PrintSingleRowWrapped(*context, table, &rows.list[index], margin.left)
+		PrintTableLine(context, table, "├", "┼", "┤", margin.left)
+		PrintSingleRowWrapped(context, table, &rows.list[index], margin.left)
 	}
 
-	PrintTableLine(*context, table, "╰", "┴", "╯", margin.left)
+	PrintTableLine(context, table, "╰", "┴", "╯", margin.left)
 }
 
 // --------------------= DURATION =--------------------
@@ -993,7 +993,7 @@ func LogPage(context *Context, logs *Logs) {
 	AddMenuItem(&menu, NewMenuItem("Delete", "Delete Data"))
 	AddGlobalMenu(&menu)
 
-	selectedMenu = MenuWithIndex(context, &menu, 0)
+	selectedMenu = MenuWithIndex(context, &menu, PosCenter+AlignLeft+SizeFit)
 
 	if !ExecuteGlobalMenu(context, selectedMenu) {
 		switch selectedMenu {

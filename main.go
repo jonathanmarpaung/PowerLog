@@ -129,24 +129,170 @@ func StrToInt(str string) int {
 	return result
 }
 
+//--------------------= STYLING & CANVAS ENGINE =--------------------
+
+// Category 1: Position Element In Canvas
+const PosLeft int = 100
+const PosCenter int = 200
+const PosRight int = 300
+
+// Category 2: Align Text
+const AlignLeft int = 10
+const AlignCenter int = 20
+const AlignRight int = 30
+
+// Category 3: Size Element
+const SizeFit int = 1
+const SizeFull int = 2
+
+type Canvas struct {
+	width int
+}
+
+type Padding struct {
+	left  int
+	right int
+}
+
+type StyleConfig struct {
+	position  int
+	alignment int
+	size      int
+}
+
+func NewCanvas(width int) Canvas {
+	var canvas Canvas
+
+	canvas.width = width
+
+	return canvas
+}
+
+func DecodeStyle(styleCode int) StyleConfig {
+	var config StyleConfig
+
+	config.position = (styleCode / 100) * 100
+	config.alignment = ((styleCode % 100) / 10) * 10
+	config.size = styleCode % 10
+
+	return config
+}
+
+func CalculatePadding(totalWidth int, contentWidth int, alignMode int) Padding {
+	var result Padding
+	var remaining int
+
+	remaining = totalWidth - contentWidth
+
+	// Prevent padding negatif if content wider than length of room
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	// Calculate space from mode (Position or Align)
+	switch {
+	case alignMode == PosLeft || alignMode == AlignLeft:
+		result.left = 0
+		result.right = remaining
+	case alignMode == PosCenter || alignMode == AlignCenter:
+		result.left = remaining / 2
+		result.right = remaining - result.left
+	case alignMode == PosRight || alignMode == AlignRight:
+		result.left = remaining
+		result.right = 0
+	default:
+		result.left = 0
+		result.right = remaining
+	}
+
+	return result
+}
+
+func PrintSpace(count int) {
+	var i int
+
+	for i = 0; i < count; i++ {
+		fmt.Printf(" ")
+	}
+}
+
 // --------------------= Box =--------------------
 
-func PrintBoxMessage(message string) {
+func SplitByNewLine(text string) WrappedText {
+	var result WrappedText
+	var currentLine string
 	var index int
 
-	// head
+	for index = 0; index < len(text); index++ {
+		if text[index] == '\n' {
+			if result.n < MaxWrapLines {
+				result.lines[result.n] = currentLine
+				result.n = result.n + 1
+				currentLine = ""
+			}
+		} else {
+			currentLine = currentLine + string(text[index])
+		}
+	}
+
+	if result.n < MaxWrapLines {
+		result.lines[result.n] = currentLine
+		result.n = result.n + 1
+	}
+
+	return result
+}
+
+func PrintBoxMessage(context *Context, message string, styleCode int) {
+	var styleConfig StyleConfig
+	var margin, textPad Padding
+	var boxWidth, maxLineWidth, index, lineIndex int
+	var splitLines WrappedText
+	var currentLine string
+
+	styleConfig = DecodeStyle(styleCode)
+	splitLines = SplitByNewLine(message)
+
+	maxLineWidth = 0
+	for index = 0; index < splitLines.n; index++ {
+		if len(splitLines.lines[index]) > maxLineWidth {
+			maxLineWidth = len(splitLines.lines[index])
+		}
+	}
+
+	if styleConfig.size == SizeFull {
+		boxWidth = context.canvas.width - 4
+	} else {
+		boxWidth = maxLineWidth
+	}
+
+	margin = CalculatePadding(context.canvas.width, boxWidth+4, styleConfig.position)
+
+	// Print Head
+	PrintSpace(margin.left)
 	fmt.Printf("╭")
-	for index = 0; index < len(message)+2; index++ {
+	for index = 0; index < boxWidth+2; index++ {
 		fmt.Printf("─")
 	}
 	fmt.Printf("╮\n")
 
-	// body
-	fmt.Printf("│ %s │\n", message)
+	// Print Body
+	for lineIndex = 0; lineIndex < splitLines.n; lineIndex++ {
+		currentLine = splitLines.lines[lineIndex]
+		textPad = CalculatePadding(boxWidth, len(currentLine), styleConfig.alignment)
 
-	// foot
+		PrintSpace(margin.left)
+		fmt.Printf("│ ")
+		PrintSpace(textPad.left)
+		fmt.Printf("%s", currentLine)
+		PrintSpace(textPad.right)
+		fmt.Printf(" │\n")
+	}
+
+	// Print Foot
+	PrintSpace(margin.left)
 	fmt.Printf("╰")
-	for index = 0; index < len(message)+2; index++ {
+	for index = 0; index < boxWidth+2; index++ {
 		fmt.Printf("─")
 	}
 	fmt.Printf("╯\n")
@@ -176,11 +322,12 @@ func SetError(errorHandler *ErrorHandler, message string) {
 	errorHandler.message = message
 }
 
-func ShowError(errorHandler ErrorHandler) {
-	PrintBoxMessage("Error: " + errorHandler.message)
+func ShowError(context *Context, errorHandler ErrorHandler) {
+	PrintBoxMessage(context, "Error: "+errorHandler.message, 0)
 }
 
 // --------------------= PAGES =--------------------
+
 const MaxPages int = 20
 
 type Page struct {
@@ -239,6 +386,11 @@ type Context struct {
 	page         Page
 	running      bool
 	errorHandler ErrorHandler
+	canvas       Canvas
+}
+
+func InitializeContext(context *Context, canvasWidth int) {
+	context.canvas = NewCanvas(canvasWidth)
 }
 
 func IsRunning(context Context) bool {
@@ -258,7 +410,7 @@ func IsThereAnError(context Context) bool {
 }
 
 func HandlerError(context *Context) {
-	ShowError(context.errorHandler)
+	ShowError(context, context.errorHandler)
 	ResetError(&context.errorHandler)
 }
 
@@ -318,7 +470,7 @@ func AddMenuItem(menu *Menu, item MenuItem) {
 
 func UpdateMenuItem(menu *Menu, index int, item MenuItem) {
 	if index >= 0 && index < menu.n {
-		menu.list[index] = item // Jauh lebih enak dibaca
+		menu.list[index] = item
 	}
 }
 
@@ -338,23 +490,52 @@ func RemoveMenuItem(menu *Menu, index int) {
 	}
 }
 
-func MenuWithIndex(context *Context, menu *Menu) string {
-	var inputStr, selection string
-	var index, choiceInt int
+func MenuWithIndex(context *Context, menu *Menu, styleCode int) string {
+	var inputStr, selection, formattedItem string
+	var index, choiceInt, maxItemWidth, menuWidth, currentItemLen int
 	var currentItem MenuItem
 	var isNumber bool
+	var styleConfig StyleConfig
+	var margin, textPad Padding
 
-	// Show menu items
+	styleConfig = DecodeStyle(styleCode)
+	maxItemWidth = 0
+
 	for index = 1; index <= menu.n; index++ {
 		currentItem = menu.list[index-1]
-		fmt.Printf("%d. %s\n", index, currentItem.label)
+		formattedItem = IntToStr(index) + ". " + currentItem.label
+		currentItemLen = len(formattedItem)
+
+		if currentItemLen > maxItemWidth {
+			maxItemWidth = currentItemLen
+		}
 	}
 
-	// input from user
+	if styleConfig.size == SizeFull {
+		menuWidth = context.canvas.width
+	} else {
+		menuWidth = maxItemWidth
+	}
+
+	margin = CalculatePadding(context.canvas.width, menuWidth, styleConfig.position)
+
+	for index = 1; index <= menu.n; index++ {
+		currentItem = menu.list[index-1]
+		formattedItem = IntToStr(index) + ". " + currentItem.label
+
+		textPad = CalculatePadding(menuWidth, len(formattedItem), styleConfig.alignment)
+
+		PrintSpace(margin.left)
+		PrintSpace(textPad.left)
+		fmt.Printf("%s", formattedItem)
+		PrintSpace(textPad.right)
+		fmt.Printf("\n")
+	}
+
+	PrintSpace(margin.left)
 	fmt.Printf("Selection: ")
 	fmt.Scan(&inputStr)
 
-	// 3. validate and process number
 	isNumber = IsNumber(inputStr)
 
 	if isNumber {
@@ -398,11 +579,13 @@ const MaxWrapLines int = 20
 type TableColumn struct {
 	label string
 	width int
+	style int
 }
 
 type Table struct {
 	columns [MaxColumns]TableColumn
 	n       int
+	style   int
 }
 
 type TableRow struct {
@@ -420,11 +603,16 @@ type WrappedText struct {
 	n     int
 }
 
-func NewColumn(label string, width int) TableColumn {
+func InitializeTable(table *Table, styleCode int) {
+	table.style = styleCode
+}
+
+func NewColumn(label string, width int, style int) TableColumn {
 	var column TableColumn
 
 	column.label = label
 	column.width = width
+	column.style = style
 
 	return column
 }
@@ -460,16 +648,38 @@ func AddRow(rows *TableRows, row TableRow) {
 	}
 }
 
-func GetColumnWidth(column TableColumn) int {
-	var width int
+func GetColumnWidth(context Context, table Table, column TableColumn) int {
+	var width, effectiveCanvas, bordersAndSpaces int
+	var styleConfig StyleConfig
 
-	if column.width == DEPENDS_ON_LABEL {
-		width = len(column.label)
+	styleConfig = DecodeStyle(table.style)
+
+	if styleConfig.size == SizeFull {
+		bordersAndSpaces = (table.n * 3) + 1
+		effectiveCanvas = context.canvas.width - bordersAndSpaces
+
+		width = (effectiveCanvas * column.width) / 100
+
 	} else {
-		width = column.width
+		if column.width == DEPENDS_ON_LABEL {
+			width = len(column.label)
+		} else {
+			width = column.width
+		}
 	}
 
 	return width
+}
+
+func GetTableTotalWidth(context Context, table Table) int {
+	var total, index int
+
+	total = (table.n * 3) + 1
+	for index = 0; index < table.n; index++ {
+		total = total + GetColumnWidth(context, table, table.columns[index])
+	}
+
+	return total
 }
 
 func WrapText(text string, width int) WrappedText {
@@ -484,16 +694,26 @@ func WrapText(text string, width int) WrappedText {
 		result.n = 1
 	} else {
 		for index = 0; index < textLen; index++ {
-			currentLine = currentLine + string(text[index])
+			if text[index] == '\n' {
+				if result.n < MaxWrapLines {
+					result.lines[result.n] = currentLine
+					result.n = result.n + 1
+					currentLine = ""
+				}
+			} else {
+				currentLine = currentLine + string(text[index])
 
-			if len(currentLine) == width {
-				result.lines[result.n] = currentLine
-				result.n = result.n + 1
-				currentLine = ""
+				if len(currentLine) == width {
+					if result.n < MaxWrapLines {
+						result.lines[result.n] = currentLine
+						result.n = result.n + 1
+						currentLine = ""
+					}
+				}
 			}
 		}
 
-		if len(currentLine) > 0 {
+		if len(currentLine) > 0 && result.n < MaxWrapLines {
 			result.lines[result.n] = currentLine
 			result.n = result.n + 1
 		}
@@ -502,15 +722,16 @@ func WrapText(text string, width int) WrappedText {
 	return result
 }
 
-func PrintTableLine(table *Table, leftChar string, midChar string, rightChar string) {
+func PrintTableLine(context Context, table *Table, leftChar string, midChar string, rightChar string, marginLeft int) {
 	var k, index, length int
 	var currentColumn TableColumn
 
+	PrintSpace(marginLeft)
 	fmt.Printf("%s", leftChar)
 
 	for index = 0; index < table.n; index++ {
 		currentColumn = table.columns[index]
-		length = GetColumnWidth(currentColumn)
+		length = GetColumnWidth(context, *table, currentColumn)
 
 		for k = 0; k < length+2; k++ {
 			fmt.Printf("─")
@@ -524,18 +745,19 @@ func PrintTableLine(table *Table, leftChar string, midChar string, rightChar str
 	}
 }
 
-func PrintSingleRowWrapped(table *Table, row *TableRow) {
+func PrintSingleRowWrapped(context Context, table *Table, row *TableRow, marginLeft int) {
 	var colIndex, lineIndex, maxLines, width int
 	var wrappedCells [MaxColumns]WrappedText
 	var currentColumn TableColumn
 	var currentCell string
 	var currentWrapped WrappedText
+	var textPad Padding
 
 	maxLines = 1
 
 	for colIndex = 0; colIndex < table.n; colIndex++ {
 		currentColumn = table.columns[colIndex]
-		width = GetColumnWidth(currentColumn)
+		width = GetColumnWidth(context, *table, currentColumn)
 
 		if colIndex < row.n {
 			currentCell = row.cells[colIndex]
@@ -552,40 +774,57 @@ func PrintSingleRowWrapped(table *Table, row *TableRow) {
 	}
 
 	for lineIndex = 0; lineIndex < maxLines; lineIndex++ {
+		PrintSpace(marginLeft)
 		fmt.Printf("│")
 
 		for colIndex = 0; colIndex < table.n; colIndex++ {
-			width = GetColumnWidth(table.columns[colIndex])
+			currentColumn = table.columns[colIndex]
+			width = GetColumnWidth(context, *table, currentColumn)
 			currentWrapped = wrappedCells[colIndex]
 
 			if lineIndex < currentWrapped.n {
-				fmt.Printf(" %-*s │", width, currentWrapped.lines[lineIndex])
+				currentCell = currentWrapped.lines[lineIndex]
 			} else {
-				fmt.Printf(" %-*s │", width, "")
+				currentCell = ""
 			}
+
+			textPad = CalculatePadding(width, len(currentCell), currentColumn.style)
+
+			fmt.Printf(" ")
+			PrintSpace(textPad.left)
+			fmt.Printf("%s", currentCell)
+			PrintSpace(textPad.right)
+			fmt.Printf(" │") // Spasi pembatas kanan + border
 		}
 		fmt.Printf("\n")
 	}
 }
 
-func PrintTable(table *Table, rows *TableRows) {
+func PrintTable(context *Context, table *Table, rows *TableRows) {
 	var headerRow TableRow
-	var index int
+	var index, tableTotalWidth int
+	var styleConfig StyleConfig
+	var margin Padding
+
+	styleConfig = DecodeStyle(table.style)
+	tableTotalWidth = GetTableTotalWidth(*context, *table)
+	margin = CalculatePadding(context.canvas.width, tableTotalWidth, styleConfig.position)
 
 	for index = 0; index < table.n; index++ {
 		AddCell(&headerRow, table.columns[index].label)
 	}
 
-	PrintTableLine(table, "╭", "┬", "╮")
+	// 3. Cetak Keseluruhan dengan menyuntikkan margin.left
+	PrintTableLine(*context, table, "╭", "┬", "╮", margin.left)
 
-	PrintSingleRowWrapped(table, &headerRow)
+	PrintSingleRowWrapped(*context, table, &headerRow, margin.left)
 
 	for index = 0; index < rows.n; index++ {
-		PrintTableLine(table, "├", "┼", "┤")
-		PrintSingleRowWrapped(table, &rows.list[index])
+		PrintTableLine(*context, table, "├", "┼", "┤", margin.left)
+		PrintSingleRowWrapped(*context, table, &rows.list[index], margin.left)
 	}
 
-	PrintTableLine(table, "╰", "┴", "╯")
+	PrintTableLine(*context, table, "╰", "┴", "╯", margin.left)
 }
 
 // --------------------= DURATION =--------------------
@@ -676,31 +915,31 @@ func DeleteLog(logs *Logs, index int) {
 	}
 }
 
-func PrintLogs(logs *Logs) {
+func PrintLogs(context *Context, logs *Logs) {
 	var index int
 	var rowTable Table
 	var rows TableRows
 	var currentRow TableRow
 
-	AddColumn(&rowTable, NewColumn("No.", DEPENDS_ON_LABEL))
-	AddColumn(&rowTable, NewColumn("Nama Perangkat", DEPENDS_ON_LABEL))
-	AddColumn(&rowTable, NewColumn("Lokasi Perangkat", DEPENDS_ON_LABEL))
-	AddColumn(&rowTable, NewColumn("Durasi Penggunaan", DEPENDS_ON_LABEL))
-	AddColumn(&rowTable, NewColumn("Daya Tergunakan", DEPENDS_ON_LABEL))
+	InitializeTable(&rowTable, PosCenter+SizeFull)
+
+	AddColumn(&rowTable, NewColumn("Number", 10, AlignCenter))
+	AddColumn(&rowTable, NewColumn("Device Name", 25, AlignLeft))
+	AddColumn(&rowTable, NewColumn("Device Location", 20, AlignLeft))
+	AddColumn(&rowTable, NewColumn("Duration", 30, AlignRight))
+	AddColumn(&rowTable, NewColumn("Power Used", 15, AlignRight))
 
 	for index = 0; index < logs.n; index++ {
 		ResetRows(&currentRow)
-
 		AddCell(&currentRow, IntToStr(index+1))
 		AddCell(&currentRow, logs.list[index].deviceName)
 		AddCell(&currentRow, logs.list[index].deviceLocation)
 		AddCell(&currentRow, DurationToStr(logs.list[index].duration))
 		AddCell(&currentRow, PowerToStr(logs.list[index].power))
-
 		AddRow(&rows, currentRow)
 	}
 
-	PrintTable(&rowTable, &rows)
+	PrintTable(context, &rowTable, &rows)
 }
 
 func LogPage(context *Context, logs *Logs) {
@@ -708,7 +947,7 @@ func LogPage(context *Context, logs *Logs) {
 	var selectedMenu string
 
 	// Print Table Log
-	PrintLogs(logs)
+	PrintLogs(context, logs)
 
 	// Menu
 	AddMenuItem(&menu, NewMenuItem("Insert", "Insert Data"))
@@ -716,7 +955,7 @@ func LogPage(context *Context, logs *Logs) {
 	AddMenuItem(&menu, NewMenuItem("Delete", "Delete Data"))
 	AddGlobalMenu(&menu)
 
-	selectedMenu = MenuWithIndex(context, &menu)
+	selectedMenu = MenuWithIndex(context, &menu, 0)
 
 	if !ExecuteGlobalMenu(context, selectedMenu) {
 		switch selectedMenu {
@@ -736,6 +975,9 @@ func main() {
 	var logs Logs
 	var context Context
 
+	// Initialize Context
+	InitializeContext(&context, 100)
+
 	// Initialize Page
 	AddListPage(&context, "Log")
 
@@ -752,12 +994,12 @@ func main() {
 	for IsRunning(context) {
 		ClearTerminal()
 
+		PrintBoxMessage(&context, "Page: "+GetCurrentPage(context), SizeFull+AlignCenter)
+
 		// Handle error
 		if IsThereAnError(context) {
 			HandlerError(&context)
 		}
-
-		fmt.Println("Page:", GetCurrentPage(context))
 
 		switch GetCurrentPage(context) {
 		case "Log":

@@ -298,6 +298,44 @@ func PrintBoxMessage(context *Context, message string, styleCode int) {
 	fmt.Printf("╯\n")
 }
 
+func PrintMessage(context *Context, message string, styleCode int) {
+	var styleConfig StyleConfig
+	var margin, textPad Padding
+	var boxWidth, maxLineWidth, index, lineIndex int
+	var splitLines WrappedText
+	var currentLine string
+
+	styleConfig = DecodeStyle(styleCode)
+	splitLines = SplitByNewLine(message)
+
+	maxLineWidth = 0
+	for index = 0; index < splitLines.n; index++ {
+		if len(splitLines.lines[index]) > maxLineWidth {
+			maxLineWidth = len(splitLines.lines[index])
+		}
+	}
+
+	if styleConfig.size == SizeFull {
+		boxWidth = context.canvas.width
+	} else {
+		boxWidth = maxLineWidth
+	}
+
+	margin = CalculatePadding(context.canvas.width, boxWidth+4, styleConfig.position)
+
+	// Print Body
+	for lineIndex = 0; lineIndex < splitLines.n; lineIndex++ {
+		currentLine = splitLines.lines[lineIndex]
+		textPad = CalculatePadding(boxWidth, len(currentLine), styleConfig.alignment)
+
+		PrintSpace(margin.left)
+		PrintSpace(textPad.left)
+		fmt.Printf("%s", currentLine)
+		PrintSpace(textPad.right)
+		fmt.Printf("\n")
+	}
+}
+
 // --------------------= Terminal =--------------------
 
 func ClearTerminal() {
@@ -323,7 +361,7 @@ func SetError(errorHandler *ErrorHandler, message string) {
 }
 
 func ShowError(context *Context, errorHandler ErrorHandler) {
-	PrintBoxMessage(context, "Error: "+errorHandler.message, 0)
+	PrintBoxMessage(context, "Error: "+errorHandler.message, PosCenter)
 }
 
 // --------------------= PAGES =--------------------
@@ -994,7 +1032,7 @@ func main() {
 	for IsRunning(context) {
 		ClearTerminal()
 
-		PrintBoxMessage(&context, "Page: "+GetCurrentPage(context), SizeFull+AlignCenter)
+		PrintMessage(&context, "Page: "+GetCurrentPage(context), SizeFull+AlignCenter)
 
 		// Handle error
 		if IsThereAnError(context) {

@@ -730,42 +730,85 @@ func LogPage(context *Context, logs *Logs) {
 	}
 }
 
+// --------------------= App Intergration =--------------------
+
+func HomePage(context *Context) {
+	var menu Menu
+	var selectedMenu string
+
+	// 1. Main Page Header Display
+	PrintBoxMessage("ENERGY LOG MANAGER - MAIN MENU")
+	fmt.Println("Welcome! Please select a module to start managing your devices.")
+	fmt.Println("")
+
+	// 2. Setup Navigation Menu
+	AddMenuItem(&menu, NewMenuItem("GoLog", "Device Usage Logs"))
+	AddMenuItem(&menu, NewMenuItem("About", "About Application"))
+	AddGlobalMenu(&menu)
+
+	// 3. Display Menu and Get Selection
+	selectedMenu = MenuWithIndex(context, &menu)
+
+	// 4. Navigation Logic (Router)
+	if !ExecuteGlobalMenu(context, selectedMenu) {
+		switch selectedMenu {
+		case "GoLog":
+			SetCurrentPage(context, "Log")
+		case "About":
+			// Example of a simple static display for the About page
+			ClearTerminal()
+			PrintBoxMessage("About: Framework v1.0")
+			fmt.Println("A simple procedural CLI framework for educational purposes.")
+			fmt.Println("")
+			fmt.Println("Press Enter to back...")
+			fmt.Scanln(&selectedMenu) // Simple pause
+		}
+	}
+}
+
 // --------------------= MAIN =--------------------
 
 func main() {
 	var logs Logs
 	var context Context
 
-	// Initialize Page
+	// 1. Register All Available Pages
+	AddListPage(&context, "Home")
 	AddListPage(&context, "Log")
 
-	// Dummy data
-	AddLog(&logs, "Laptop", "Kamar Tidur", 123.23, NewDuration(1, 20, 30))
-	AddLog(&logs, "Kipas Angin", "Ruang Tamu", 45.50, NewDuration(4, 0, 0))
+	// 2. Data Initialization (Dummy Data)
+	AddLog(&logs, "Laptop", "Bedroom", 120.00, NewDuration(2, 0, 0))
+	AddLog(&logs, "LED Lamp", "Porch", 15.50, NewDuration(12, 0, 0))
 
-	// running
+	// 3. Start Program and Set Initial Page
 	StartProgram(&context)
+	SetCurrentPage(&context, "Home")
 
-	// NOTE: name page must be valid!
-	SetCurrentPage(&context, "Log")
-
+	// 4. Main Application Loop
 	for IsRunning(context) {
 		ClearTerminal()
 
-		// Handle error
+		// Global Error Handler: Appears on every page if an error occurs
 		if IsThereAnError(context) {
 			HandlerError(&context)
 		}
 
-		fmt.Println("Page:", GetCurrentPage(context))
+		// Breadcrumb / Page Location Indicator
+		fmt.Println("Location:", GetCurrentPage(context))
+		fmt.Println("---------------------------------------------------------")
 
+		// Router: Selects the page function based on CurrentPage
 		switch GetCurrentPage(context) {
+		case "Home":
+			HomePage(&context)
 		case "Log":
 			LogPage(&context, &logs)
-
-		// prevent crazy loop
 		default:
-			LogPage(&context, &logs)
+			HomePage(&context)
 		}
 	}
+
+	// Termination message when the program stops
+	ClearTerminal()
+	fmt.Println("Program terminated. Thank you for using Energy Log Manager!")
 }

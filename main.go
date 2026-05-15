@@ -180,6 +180,112 @@ func ShowError(errorHandler ErrorHandler) {
 	PrintBoxMessage("Error: " + errorHandler.message)
 }
 
+// --------------------= PAGES =--------------------
+const MaxPages int = 20
+
+type Page struct {
+	pages       [MaxPages]string
+	currentPage string
+	n           int
+}
+
+func InsertPage(page *Page, namePage string) {
+	if page.n < MaxPages {
+		page.pages[page.n] = namePage
+		page.n = page.n + 1
+	}
+}
+
+func GetPageIndex(page Page, namePage string) int {
+	var index, atPosition int
+
+	for index < page.n && page.pages[index] != namePage {
+		index = index + 1
+	}
+
+	if index == page.n {
+		atPosition = -1
+	} else {
+		atPosition = index
+	}
+
+	return atPosition
+}
+
+func IsPageExist(page Page, namePage string) bool {
+	return GetPageIndex(page, namePage) != -1
+}
+
+func DeletePage(page *Page, namePage string) {
+	var index, targetIndex int
+
+	if page.n > 0 {
+		targetIndex = GetPageIndex(*page, namePage)
+
+		if targetIndex != -1 {
+			for index = targetIndex; index < page.n-1; index++ {
+				page.pages[index] = page.pages[index+1]
+			}
+
+			page.pages[page.n-1] = ""
+			page.n = page.n - 1
+		}
+	}
+}
+
+// --------------------= PROGRAM =--------------------
+
+type Context struct {
+	page         Page
+	running      bool
+	errorHandler ErrorHandler
+}
+
+func IsRunning(context Context) bool {
+	return context.running
+}
+
+func StartProgram(context *Context) {
+	context.running = true
+}
+
+func StopProgram(context *Context) {
+	context.running = false
+}
+
+func IsThereAnError(context Context) bool {
+	return context.errorHandler.isError
+}
+
+func HandlerError(context *Context) {
+	ShowError(context.errorHandler)
+	ResetError(&context.errorHandler)
+}
+
+func ThrowError(context *Context, message string) {
+	SetError(&context.errorHandler, message)
+}
+
+func AddListPage(context *Context, pageName string) {
+	InsertPage(&context.page, pageName)
+}
+
+func RemovePageFromList(context *Context, pageName string) {
+	DeletePage(&context.page, pageName)
+}
+
+func GetCurrentPage(context Context) string {
+	return context.page.currentPage
+}
+
+func SetCurrentPage(context *Context, namePage string) {
+	if IsPageExist(context.page, namePage) {
+		context.page.currentPage = namePage
+	} else {
+		ThrowError(context, "There's no exist page "+namePage)
+	}
+}
+
 // --------------------= Menu =--------------------
 
 const MaxMenuItem int = 20
@@ -203,16 +309,16 @@ func NewMenuItem(id string, label string) MenuItem {
 	return item
 }
 
-func AddMenuItem(menu *Menu, list MenuItem) {
+func AddMenuItem(menu *Menu, item MenuItem) {
 	if menu.n < MaxMenuItem {
-		menu.list[menu.n] = list
+		menu.list[menu.n] = item
 		menu.n = menu.n + 1
 	}
 }
 
-func UpdateMenuItem(menu *Menu, index int, list MenuItem) {
+func UpdateMenuItem(menu *Menu, index int, item MenuItem) {
 	if index >= 0 && index < menu.n {
-		menu.list[index] = list
+		menu.list[index] = item // Jauh lebih enak dibaca
 	}
 }
 
@@ -232,7 +338,7 @@ func RemoveMenuItem(menu *Menu, index int) {
 	}
 }
 
-func MenuWithIndex(menu Menu, errorHandler *ErrorHandler) string {
+func MenuWithIndex(context *Context, menu *Menu) string {
 	var inputStr, selection string
 	var index, choiceInt int
 	var currentItem MenuItem
@@ -257,13 +363,30 @@ func MenuWithIndex(menu Menu, errorHandler *ErrorHandler) string {
 		if choiceInt >= 1 && choiceInt <= menu.n {
 			selection = menu.list[choiceInt-1].id
 		} else {
-			SetError(errorHandler, "There is no option "+IntToStr(choiceInt)+" in the menu!")
+			ThrowError(context, "There is no option "+IntToStr(choiceInt)+" in the menu!")
 		}
 	} else {
-		SetError(errorHandler, "Input must be a number!")
+		ThrowError(context, "Input must be a number!")
 	}
 
 	return selection
+}
+
+func AddGlobalMenu(menu *Menu) {
+	AddMenuItem(menu, NewMenuItem("Exit", "Exit"))
+}
+
+func ExecuteGlobalMenu(context *Context, menuID string) bool {
+	var isGlobal bool
+	isGlobal = false
+
+	switch menuID {
+	case "Exit":
+		StopProgram(context)
+		isGlobal = true
+	}
+
+	return isGlobal
 }
 
 // --------------------= TABLE =--------------------
@@ -379,7 +502,7 @@ func WrapText(text string, width int) WrappedText {
 	return result
 }
 
-func PrintTableLine(table Table, leftChar string, midChar string, rightChar string) {
+func PrintTableLine(table *Table, leftChar string, midChar string, rightChar string) {
 	var k, index, length int
 	var currentColumn TableColumn
 
@@ -401,7 +524,7 @@ func PrintTableLine(table Table, leftChar string, midChar string, rightChar stri
 	}
 }
 
-func PrintSingleRowWrapped(table Table, row TableRow) {
+func PrintSingleRowWrapped(table *Table, row *TableRow) {
 	var colIndex, lineIndex, maxLines, width int
 	var wrappedCells [MaxColumns]WrappedText
 	var currentColumn TableColumn
@@ -445,7 +568,7 @@ func PrintSingleRowWrapped(table Table, row TableRow) {
 	}
 }
 
-func PrintTable(table Table, rows TableRows) {
+func PrintTable(table *Table, rows *TableRows) {
 	var headerRow TableRow
 	var index int
 
@@ -455,11 +578,11 @@ func PrintTable(table Table, rows TableRows) {
 
 	PrintTableLine(table, "╭", "┬", "╮")
 
-	PrintSingleRowWrapped(table, headerRow)
+	PrintSingleRowWrapped(table, &headerRow)
 
 	for index = 0; index < rows.n; index++ {
 		PrintTableLine(table, "├", "┼", "┤")
-		PrintSingleRowWrapped(table, rows.list[index])
+		PrintSingleRowWrapped(table, &rows.list[index])
 	}
 
 	PrintTableLine(table, "╰", "┴", "╯")
@@ -553,7 +676,7 @@ func DeleteLog(logs *Logs, index int) {
 	}
 }
 
-func PrintLog(logs Logs) {
+func PrintLogs(logs *Logs) {
 	var index int
 	var rowTable Table
 	var rows TableRows
@@ -577,43 +700,25 @@ func PrintLog(logs Logs) {
 		AddRow(&rows, currentRow)
 	}
 
-	PrintTable(rowTable, rows)
+	PrintTable(&rowTable, &rows)
 }
 
-// --------------------= MAIN =--------------------
-
-func main() {
-	var logs Logs
+func LogPage(context *Context, logs *Logs) {
 	var menu Menu
-	var running bool
 	var selectedMenu string
-	var errorHandler ErrorHandler
+
+	// Print Table Log
+	PrintLogs(logs)
 
 	// Menu
 	AddMenuItem(&menu, NewMenuItem("Insert", "Insert Data"))
 	AddMenuItem(&menu, NewMenuItem("Update", "Update Data"))
 	AddMenuItem(&menu, NewMenuItem("Delete", "Delete Data"))
-	AddMenuItem(&menu, NewMenuItem("Exit", "Exit"))
+	AddGlobalMenu(&menu)
 
-	// Dummy data
-	AddLog(&logs, "Laptop", "Kamar Tidur", 123.23, NewDuration(1, 20, 30))
-	AddLog(&logs, "Kipas Angin", "Ruang Tamu", 45.50, NewDuration(4, 0, 0))
+	selectedMenu = MenuWithIndex(context, &menu)
 
-	// running
-	running = true
-
-	for running {
-		ClearTerminal()
-
-		PrintLog(logs)
-
-		if errorHandler.isError {
-			ShowError(errorHandler)
-			ResetError(&errorHandler)
-		}
-
-		selectedMenu = MenuWithIndex(menu, &errorHandler)
-
+	if !ExecuteGlobalMenu(context, selectedMenu) {
 		switch selectedMenu {
 		case "Insert":
 			// TODO: create function to handle insert data, example: InsertLogFeature(&logs, &errorHandler)
@@ -621,8 +726,46 @@ func main() {
 			// TODO: create function to handle update data, example: UpdateLogFeature(&logs, &errorHandler)
 		case "Delete":
 			// TODO: create function to handle delete data, example: DeleteLogFeature(&logs, &errorHandler)
-		case "Exit":
-			running = false
+		}
+	}
+}
+
+// --------------------= MAIN =--------------------
+
+func main() {
+	var logs Logs
+	var context Context
+
+	// Initialize Page
+	AddListPage(&context, "Log")
+
+	// Dummy data
+	AddLog(&logs, "Laptop", "Kamar Tidur", 123.23, NewDuration(1, 20, 30))
+	AddLog(&logs, "Kipas Angin", "Ruang Tamu", 45.50, NewDuration(4, 0, 0))
+
+	// running
+	StartProgram(&context)
+
+	// NOTE: name page must be valid!
+	SetCurrentPage(&context, "Log")
+
+	for IsRunning(context) {
+		ClearTerminal()
+
+		// Handle error
+		if IsThereAnError(context) {
+			HandlerError(&context)
+		}
+
+		fmt.Println("Page:", GetCurrentPage(context))
+
+		switch GetCurrentPage(context) {
+		case "Log":
+			LogPage(&context, &logs)
+
+		// prevent crazy loop
+		default:
+			LogPage(&context, &logs)
 		}
 	}
 }
